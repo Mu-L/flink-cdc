@@ -31,6 +31,7 @@ import org.apache.flink.shaded.guava31.com.google.common.primitives.Floats;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /** Built-in AI functions available to transform expressions. */
 public class AiFunctions {
@@ -39,53 +40,89 @@ public class AiFunctions {
 
     private AiFunctions() {}
 
-    public static BinaryVariant aiComplete(AiModelClient model, String input, String systemPrompt) {
-        return generateText(model, AiTextFunctionDef.AI_COMPLETE, input, systemPrompt);
+    public static BinaryVariant aiComplete(
+            String modelName,
+            String input,
+            String systemPrompt,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(
+                modelClients, modelName, AiTextFunctionDef.AI_COMPLETE, input, systemPrompt);
     }
 
-    public static BinaryVariant aiClassify(AiModelClient model, String input, String labels) {
-        return generateText(model, AiTextFunctionDef.AI_CLASSIFY, input, labels);
+    public static BinaryVariant aiClassify(
+            String modelName,
+            String input,
+            String labels,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(modelClients, modelName, AiTextFunctionDef.AI_CLASSIFY, input, labels);
     }
 
     public static BinaryVariant aiTranslate(
-            AiModelClient model, String input, String sourceLang, String targetLang) {
-        return generateText(model, AiTextFunctionDef.AI_TRANSLATE, input, sourceLang, targetLang);
+            String modelName,
+            String input,
+            String sourceLang,
+            String targetLang,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(
+                modelClients,
+                modelName,
+                AiTextFunctionDef.AI_TRANSLATE,
+                input,
+                sourceLang,
+                targetLang);
     }
 
-    public static BinaryVariant aiSummarize(AiModelClient model, String input, int maxLength) {
-        return generateText(model, AiTextFunctionDef.AI_SUMMARIZE, input, maxLength);
+    public static BinaryVariant aiSummarize(
+            String modelName,
+            String input,
+            int maxLength,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(
+                modelClients, modelName, AiTextFunctionDef.AI_SUMMARIZE, input, maxLength);
     }
 
-    public static BinaryVariant aiSentiment(AiModelClient model, String input) {
-        return generateText(model, AiTextFunctionDef.AI_SENTIMENT, input);
+    public static BinaryVariant aiSentiment(
+            String modelName, String input, Map<String, AiModelClient> modelClients) {
+        return generateText(modelClients, modelName, AiTextFunctionDef.AI_SENTIMENT, input);
     }
 
-    public static BinaryVariant aiExtract(AiModelClient model, String input, String schema) {
-        return generateText(model, AiTextFunctionDef.AI_EXTRACT, input, schema);
+    public static BinaryVariant aiExtract(
+            String modelName,
+            String input,
+            String schema,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(modelClients, modelName, AiTextFunctionDef.AI_EXTRACT, input, schema);
     }
 
-    public static BinaryVariant aiMask(AiModelClient model, String input, String entities) {
-        return generateText(model, AiTextFunctionDef.AI_MASK, input, entities);
+    public static BinaryVariant aiMask(
+            String modelName,
+            String input,
+            String entities,
+            Map<String, AiModelClient> modelClients) {
+        return generateText(modelClients, modelName, AiTextFunctionDef.AI_MASK, input, entities);
     }
 
     private static BinaryVariant generateText(
-            AiModelClient model,
+            Map<String, AiModelClient> modelClients,
+            String modelName,
             AiTextFunctionDef function,
             String input,
             Object... promptArguments) {
         if (input == null) {
             return null;
         }
-        if (!(model instanceof SupportsTextGeneration)) {
-            throw new UnsupportedOperationException(
-                    "Model " + model.getClass().getName() + " does not support text generation");
-        }
+        SupportsTextGeneration model =
+                resolveModel(
+                        modelClients,
+                        modelName,
+                        function.getFunctionName(),
+                        SupportsTextGeneration.class);
 
         String prompt =
                 function.buildPrompt(promptArguments)
                         + "\n"
                         + buildOutputSchemaHint(function.getOutputType());
-        String json = ((SupportsTextGeneration) model).generate(prompt, input);
+        String json = model.generate(prompt, input);
         if (json == null) {
             return null;
         }
@@ -101,43 +138,77 @@ public class AiFunctions {
         }
     }
 
-    public static List<Float> aiEmbed(AiModelClient model, String input) {
+    public static List<Float> aiEmbed(
+            String modelName, String input, Map<String, AiModelClient> modelClients) {
         if (input == null) {
             return null;
         }
-        if (!(model instanceof SupportsEmbedding)) {
-            throw new UnsupportedOperationException(
-                    "Model " + model.getClass().getName() + " does not support embedding");
-        }
-        float[] embedding = ((SupportsEmbedding) model).embed(input);
+        SupportsEmbedding model =
+                resolveModel(modelClients, modelName, "AI_EMBED", SupportsEmbedding.class);
+        float[] embedding = model.embed(input);
         return embedding == null ? null : Floats.asList(embedding);
     }
 
     /** Dispatches image-to-text AI functions. */
-    public static String aiImageComplete(AiModelClient model, byte[] image, String prompt) {
+    public static String aiImageComplete(
+            String modelName,
+            byte[] image,
+            String prompt,
+            Map<String, AiModelClient> modelClients) {
         if (image == null) {
             return null;
         }
-        if (!(model instanceof SupportsImageTextGeneration)) {
-            throw new UnsupportedOperationException(
-                    "Model "
-                            + model.getClass().getName()
-                            + " does not support image text generation");
-        }
-        return ((SupportsImageTextGeneration) model).generateTextFromImage(image, prompt);
+        SupportsImageTextGeneration model =
+                resolveModel(
+                        modelClients,
+                        modelName,
+                        "AI_IMAGE_COMPLETE",
+                        SupportsImageTextGeneration.class);
+        return model.generateTextFromImage(image, prompt);
     }
 
     /** Dispatches image embedding AI functions. */
-    public static List<Float> aiImageEmbed(AiModelClient model, byte[] image) {
+    public static List<Float> aiImageEmbed(
+            String modelName, byte[] image, Map<String, AiModelClient> modelClients) {
         if (image == null) {
             return null;
         }
-        if (!(model instanceof SupportsImageEmbedding)) {
-            throw new UnsupportedOperationException(
-                    "Model " + model.getClass().getName() + " does not support image embedding");
-        }
-        float[] embedding = ((SupportsImageEmbedding) model).embedImage(image);
+        SupportsImageEmbedding model =
+                resolveModel(
+                        modelClients, modelName, "AI_IMAGE_EMBED", SupportsImageEmbedding.class);
+        float[] embedding = model.embedImage(image);
         return embedding == null ? null : Floats.asList(embedding);
+    }
+
+    private static <T> T resolveModel(
+            Map<String, AiModelClient> modelClients,
+            String modelName,
+            String functionName,
+            Class<T> requiredCapability) {
+        if (modelName == null) {
+            throw new IllegalArgumentException(
+                    "Model name referenced by " + functionName + " must not be null.");
+        }
+        AiModelClient model = modelClients.get(modelName);
+        if (model == null) {
+            throw new IllegalArgumentException(
+                    "Model '"
+                            + modelName
+                            + "' referenced by "
+                            + functionName
+                            + " has not been declared.");
+        }
+        if (!requiredCapability.isInstance(model)) {
+            throw new UnsupportedOperationException(
+                    "Model '"
+                            + modelName
+                            + "' could not be used in "
+                            + functionName
+                            + " because it does not implement "
+                            + requiredCapability.getSimpleName()
+                            + " interface.");
+        }
+        return requiredCapability.cast(model);
     }
 
     private static String truncateInvalidJsonResponse(String response) {

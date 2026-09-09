@@ -30,6 +30,7 @@ import org.codehaus.janino.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -72,7 +73,7 @@ public class TransformFilterProcessor {
         this.decimalPrecisionMode = decimalPrecisionMode;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
-        this.modelClients = modelClients;
+        this.modelClients = modelClients == null ? Collections.emptyMap() : modelClients;
 
         if (isNoOp) {
             this.transformExpressionKey = null;
@@ -87,7 +88,7 @@ public class TransformFilterProcessor {
                                     .toArray(new SupportedMetadataColumn[0]));
             this.expressionEvaluator =
                     TransformExpressionCompiler.compileExpression(
-                            transformExpressionKey, udfDescriptors, modelClients);
+                            transformExpressionKey, udfDescriptors);
         }
     }
 
@@ -223,8 +224,8 @@ public class TransformFilterProcessor {
         // 3 - Add UDF function instances
         params.addAll(udfFunctionInstances);
 
-        // 4 - Add AI model client instances
-        params.addAll(modelClients.values());
+        // 4 - Add AI model clients
+        params.add(modelClients);
         return params.toArray();
     }
 

@@ -66,7 +66,7 @@ public class ProjectionColumnProcessor {
         this.transformExpressionKey = generateTransformExpressionKey();
         this.expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(
-                        transformExpressionKey, udfDescriptors, modelClients);
+                        transformExpressionKey, udfDescriptors);
         this.udfFunctionInstances = udfFunctionInstances;
     }
 
@@ -148,8 +148,8 @@ public class ProjectionColumnProcessor {
         // 3 - Add UDF function instances
         params.addAll(udfFunctionInstances);
 
-        // 4 - Add AI model client instances
-        params.addAll(modelClients.values());
+        // 4 - Add AI model clients
+        params.add(modelClients);
         return params.toArray();
     }
 
